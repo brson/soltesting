@@ -21,25 +21,45 @@ extern "C" {
     fn __powidf2(f: f64, n: i32) -> f64;
 }
 
+
 // does not work
 #[no_mangle]
 #[inline(never)]
+//#[link_section = ".easy-decompile"]
 fn powi_intr(f: f64, n: i32) -> f64 {
+    // logical right shift before call
     unsafe { std::intrinsics::powif64(f, n) }
-    //unsafe { __powidf2(f, n) }
 }
 
 // works
 #[no_mangle]
 #[inline(never)]
+//#[link_section = ".easy-decompile"]
 fn powi_rt(f: f64, n: i32) -> f64 {
+    // arithmetic right shift before call
     unsafe { __powidf2(f, n) }
 }
 
 #[no_mangle]
 #[inline(never)]
+//#[link_section = ".easy-decompile"]
+fn c_fn(f: f64, n: i32) -> f64 {
+    // arithmetic right shift before call
+    unsafe { __powidf2(f, n) }
+}
+
+// prevent constant folding if powi is inlined into run_test
+#[no_mangle]
+#[inline(never)]
+fn values() -> (f64, i32) {
+    (10.0, -1)
+}
+
+#[no_mangle]
+#[inline(never)]
 fn run_test() {
-    let value = powi_intr(10.0, -1);
+    let (f, i) = values();
+    let value = powi_rt(f, i);
     fmtprint(value)
 }
 
