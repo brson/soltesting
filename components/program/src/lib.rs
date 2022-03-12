@@ -40,14 +40,6 @@ fn powi_rt(f: f64, n: i32) -> f64 {
     unsafe { __powidf2(f, n) }
 }
 
-#[no_mangle]
-#[inline(never)]
-//#[link_section = ".easy-decompile"]
-fn c_fn(f: f64, n: i32) -> f64 {
-    // arithmetic right shift before call
-    unsafe { __powidf2(f, n) }
-}
-
 // prevent constant folding if powi is inlined into run_test
 #[no_mangle]
 #[inline(never)]
@@ -59,7 +51,7 @@ fn values() -> (f64, i32) {
 #[inline(never)]
 fn run_test() {
     let (f, i) = values();
-    let value = powi_rt(f, i);
+    let value = powi_intr(f, i);
     fmtprint(value)
 }
 
