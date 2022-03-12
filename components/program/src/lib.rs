@@ -1,57 +1,51 @@
-use borsh::de::BorshDeserialize;
-use common::{ProgramInstruction, TransferInstruction};
-use solana_program::{
-    account_info::{next_account_info, AccountInfo},
-    entrypoint,
-    entrypoint::ProgramResult,
-    msg,
-    program::invoke,
-    pubkey::Pubkey,
-    system_instruction, system_program,
-};
+#![allow(unused)]
+#![feature(core_intrinsics)]
 
-entrypoint!(process_instruction);
+solana_program::custom_heap_default!();
+solana_program::custom_panic_default!();
 
-fn process_instruction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
-    msg!("process instruction");
-    let instr = ProgramInstruction::deserialize(&mut &instruction_data[..])?;
-    let instr: &dyn Exec = match &instr {
-        ProgramInstruction::Transfer(instr) => instr,
-    };
-    instr.exec(program_id, accounts)
+extern "C" {
+    fn sol_log_(ptr: *const u8, len: usize);
 }
 
-trait Exec {
-    fn exec(&self, program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult;
+// also happens with f32
+use solana_program::msg;
+
+#[no_mangle]
+pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+    run_test();
+    0
 }
 
-impl Exec for TransferInstruction {
-    fn exec(&self, _program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
+extern "C" {
+    fn __powidf2(f: f64, n: i32) -> f64;
+}
 
-        let payer = next_account_info(account_info_iter)?;
-        let recipient = next_account_info(account_info_iter)?;
-        let system_account = next_account_info(account_info_iter)?;
+// does not work
+#[no_mangle]
+#[inline(never)]
+fn powi_intr(f: f64, n: i32) -> f64 {
+    unsafe { std::intrinsics::powif64(f, n) }
+    //unsafe { __powidf2(f, n) }
+}
 
-        {
-            msg!("payer: {:?}", payer.key);
-            msg!("recipient: {:?}", recipient.key);
+// works
+#[no_mangle]
+#[inline(never)]
+fn powi_rt(f: f64, n: i32) -> f64 {
+    unsafe { __powidf2(f, n) }
+}
 
-            assert!(payer.is_writable);
-            assert!(payer.is_signer);
-            assert!(recipient.is_writable);
+#[no_mangle]
+#[inline(never)]
+fn run_test() {
+    let value = powi_intr(10.0, -1);
+    fmtprint(value)
+}
 
-            assert_eq!(&system_program::ID, system_account.key);
-            assert!(system_account.executable);
-        }
-
-        invoke(
-            &system_instruction::transfer(payer.key, recipient.key, self.amount),
-            &[payer.clone(), recipient.clone(), system_account.clone()],
-        )
-    }
+#[no_mangle]
+#[inline(never)]
+fn fmtprint(value: f64) {
+    let value = format!("{}", value);
+    unsafe { sol_log_(value.as_ptr(), value.len()) };
 }
